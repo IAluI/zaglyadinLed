@@ -1,25 +1,33 @@
-/*
- * led.c
- *
- * Created: 23.03.2019 16:04:06
- * Author: main
- */
-
 #include <tiny2313a.h>
 #include <interrupt.h>
 #include <stdint.h>
 
-#ifndef _BV
-#define _BV(n) (1<<n)
-#endif
-
 #define F_CPU 8000000
-#define SPEED 300000    //Скорость бегущих огней
 
-uint8_t brightness[3] = {
-    0b01000000,
-    0b00010000,
-    0b00000010
+// Старший бит режим яркости, 2 младших бита режим скорости
+uint8_t settings = 0b000;
+// Массив скоростей
+uint16_t speed[4] = {
+    0x0000,
+    0x8000,
+    0xC000,
+    0xE000
+};
+// Массив яркостей
+uint8_t brightnessShift = 0;
+uint8_t brightness[12] = {
+    0b11111111,
+    0b10110011,
+    0b00110011,
+    0b10110011,
+    0b01111101,
+    0b00100100,
+    0b01111101,
+    0b01010111,
+    0b00011001,
+    0b01010111,
+    0b00111101,
+    0b00010001
 };
 uint8_t brightnessMask = 0b00000001;
 
@@ -28,14 +36,13 @@ typedef struct pinAdreses_t {
     uint8_t pin;
 }pinAdreses;
 pinAdreses ledAdreses[12];
-
+// Размер массива адресов диодов
 uint8_t ledAdresesLen = sizeof(ledAdreses) / sizeof(pinAdreses);
-
+// Функция чтения состояния ключей
 uint8_t getInputValue (uint8_t port) {
     return ( port & 0b00111000 ) >> 3;
-    //return ( port & 0b00001000 ) >> 3;
 }
-
+// Вспомогательная функция для реализации модуляции
 void setBrightness (pinAdreses *ledAdr, uint8_t brightnessIndex) {
     if(brightness[brightnessIndex] & brightnessMask) {
 		*ledAdr->port |= ledAdr->pin;
@@ -72,10 +79,14 @@ void main(void) {
     ledAdreses[10].pin = (1 << 6);
     ledAdreses[11].port = &PORTB;
     ledAdreses[11].pin = (1 << 7);
-
+    
+    // Конфигурируем и инициализируем порты ввода вывода
 	DDRA = 0b011;
+    PORTA = 0b100;
     DDRB = 0b11111111;
+    PORTB = 0b00000000;
     DDRD = 0b1000111;
+    PORTD = 0b0111000;
 
     // Настройка таймеров
     TIFR = 0x0; // сброс регистра флагов
@@ -92,31 +103,37 @@ void main(void) {
     TCNT1 = 0b0;
 
     TCCR0B = 0b00000100; // Запуск таймера0 с делителем 256
+
 	//TCCR1B = 0b00000010; // Запуск таймера1 с делителем 8
 	//TCCR1B = 0b00000100; // Запуск таймера1 с делителем 256
     TCCR1B = 0b00000011; // Запуск таймера1 с делителем 64
 }
 
 ISR(TIM0_OVF) {
-    //uint8_t i;
+    uint8_t i;
+    // Сохраняем текущее состояние счетчика в буфер
 	uint8_t buff = counter;
-
+    // Модуляция
 	brightnessMask = (brightnessMask >> 1) | (brightnessMask << 7);
 	TCNT0 = ~brightnessMask;
-
-    /*for (i = 0; i < ledAdresesLen; i++) {
-        setBrightness(&ledAdreses[i], (i + buff) % 3);
-    }*/
-
-    setBrightness(&ledAdreses[(buff + 3) % 12], 0);
-	setBrightness(&ledAdreses[(buff + 2) % 12], 1);
-	setBrightness(&ledAdreses[(buff + 1) % 12], 2);
+	// Зажигаем диоды
+    for (i = 0; i < 3; i++) {
+        setBrightness(&ledAdreses[(buff + 3 - i) % 12], i + brightnessShift * 6);
+    }
 }
 
 ISR(TIM1_OVF) {
-    //TCNT1 = 0b0;
+    // Считываем состояние ключей
+    settings = getInputValue(PIND);
+    // Выставляем начальное значение счетчика в соответсвии с выбранной скоростью
+    TCNT1 = speed[settings & 0b011];
+    // Сохраняем настройки яркости
+    brightnessShift = settings >> 2;
+
+    // Обнуляем счетчик
 	if (++counter == ledAdresesLen) {
 		counter = 0;
 	}
+	// Гасим диод идущий за последним горящим
 	*(ledAdreses[counter % 12].port) &= ~ledAdreses[counter].pin;
 }
