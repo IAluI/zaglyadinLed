@@ -118,7 +118,7 @@ ISR(TIM0_OVF) {
 	TCNT0 = ~brightnessMask;
 	// Зажигаем диоды
     for (i = 0; i < 3; i++) {
-        setBrightness(&ledAdreses[(buff + 3 - i) % 12], i + brightnessShift * 6);
+        setBrightness(&ledAdreses[(buff + 3 - i) % 12], i + brightnessShift * 9);
     }
 }
 
