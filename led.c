@@ -92,7 +92,8 @@ void main(void) {
     TCNT1 = 0b0;
 
     TCCR0B = 0b00000100; // Запуск таймера0 с делителем 256
-	TCCR1B = 0b00000010; // Запуск таймера1 с делителем 1024
+	//TCCR1B = 0b00000010; // Запуск таймера1 с делителем 8
+	TCCR1B = 0b00000100; // Запуск таймера1 с делителем 256
 }
 
 ISR(TIM0_OVF) {
@@ -102,12 +103,12 @@ ISR(TIM0_OVF) {
 	brightnessMask = (brightnessMask >> 1) | (brightnessMask << 7);
 	TCNT0 = ~brightnessMask;
 
-    /*for (i = 0; i < ledAdresesLen; i++) {
+    for (i = 0; i < ledAdresesLen; i++) {
         setBrightness(&ledAdreses[i], (i + buff) % 3);
-    }*/
-	setBrightness(&ledAdreses[(buff + 1) % 12], 0);
+    }
+	/*setBrightness(&ledAdreses[(buff + 1) % 12], 0);
 	setBrightness(&ledAdreses[(buff) % 12], 1);
-	setBrightness(&ledAdreses[(buff - 1) % 12], 2);
+	setBrightness(&ledAdreses[(buff - 1) % 12], 2);*/
 }
 
 ISR(TIM1_OVF) {
