@@ -17,7 +17,7 @@
 #define SPEED 300000    //Скорость бегущих огней
 
 uint8_t brightness[3] = {
-    0b10000000,
+    0b01000000,
     0b00010000,
     0b00000010
 };
@@ -93,7 +93,8 @@ void main(void) {
 
     TCCR0B = 0b00000100; // Запуск таймера0 с делителем 256
 	//TCCR1B = 0b00000010; // Запуск таймера1 с делителем 8
-	TCCR1B = 0b00000100; // Запуск таймера1 с делителем 256
+	//TCCR1B = 0b00000100; // Запуск таймера1 с делителем 256
+    TCCR1B = 0b00000011; // Запуск таймера1 с делителем 64
 }
 
 ISR(TIM0_OVF) {
@@ -103,17 +104,19 @@ ISR(TIM0_OVF) {
 	brightnessMask = (brightnessMask >> 1) | (brightnessMask << 7);
 	TCNT0 = ~brightnessMask;
 
-    for (i = 0; i < ledAdresesLen; i++) {
+    /*for (i = 0; i < ledAdresesLen; i++) {
         setBrightness(&ledAdreses[i], (i + buff) % 3);
-    }
-	/*setBrightness(&ledAdreses[(buff + 1) % 12], 0);
-	setBrightness(&ledAdreses[(buff) % 12], 1);
-	setBrightness(&ledAdreses[(buff - 1) % 12], 2);*/
+    }*/
+
+    setBrightness(&ledAdreses[(buff + 3) % 12], 0);
+	setBrightness(&ledAdreses[(buff + 2) % 12], 1);
+	setBrightness(&ledAdreses[(buff + 1) % 12], 2);
 }
 
 ISR(TIM1_OVF) {
-    TCNT1 = 0b0;
-	if (++counter == (sizeof(ledAdreses) / sizeof(pinAdreses) + 1)) {
+    //TCNT1 = 0b0;
+	if (++counter == ledAdresesLen) {
 		counter = 0;
 	}
+	*(ledAdreses[counter % 12].port) &= ~ledAdreses[counter].pin;
 }
