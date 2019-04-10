@@ -2,7 +2,7 @@
 #include <interrupt.h>
 #include <stdint.h>
 
-#define F_CPU 8000000
+//#define F_CPU 8000000
 
 // Старший бит режим яркости, 2 младших бита режим скорости
 uint8_t settings = 0b000;
@@ -25,15 +25,15 @@ uint16_t speed[4] = {
 // Массив яркостей
 uint8_t brightnessShift = 0;
 uint8_t brightness[9] = {
-    0b00000000,
+    0b11111111,
     0b10000000,
     0b00011001,
 
-    0b00000000,
+    0b11111111,
     0b10011001,
     0b00110011,
 
-    0b00000000,
+    0b11111111,
     0b10110011,
     0b01001101
 };
