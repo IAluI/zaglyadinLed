@@ -2,21 +2,26 @@
 #include <interrupt.h>
 #include <stdint.h>
 
-uint16_t velocity = 0;
+uint16_t velocity = 35000;
 uint8_t velocityCounter = 0;
 uint8_t inverse = 0;
-uint8_t velocityChangePeriod = 366;
-int16_t a = 5000;
+uint8_t velocityChangePeriod = 244;
+uint16_t a = 5000;
 void acceleration() {
-  int16_t diff = velocity + a;
-  if (diff >= 0xffff) {
+  uint16_t diff;
+  uint8_t flags;
+  cli();
+  diff = velocity + (-2 * inverse + 1) * a;
+  flags = SREG;
+  sei();
+  if (flags & 0b1000) {
     inverse = !inverse;
     a = -a;
-    velocity = velocity + a;
-  } else if (diff <= 0) {
+    velocity = 0xffff;
+  } else if (flags & 0b100) {
     inverse = !inverse;
     a = -a;
-    velocity = -diff;
+    velocity = 0b0;
   } else {
     velocity = diff;
   }
@@ -34,9 +39,9 @@ uint8_t ledAddressShift = 0;
 
 //Массив яркостей светодиодов
 uint8_t ledBrightness[ledAddressesLen] = {
-    0b11111111,
-    0b10000000,
     0b00011001,
+    0b10000000,
+    0b11111111,
     0b00000000,
     0b00000000,
     0b00000000,
@@ -50,8 +55,8 @@ uint8_t ledBrightness[ledAddressesLen] = {
 uint8_t brightnessMask = 0b00000001;
 
 // Вспомогательная функция для реализации модуляции
-void setBrightness(pinAddresses *ledAdr, uint8_t brightnessIndex) {
-  if (brightness[brightnessIndex] & brightnessMask) {
+void setBrightness(pinAddresses *ledAdr, uint8_t brightness) {
+  if (brightness & brightnessMask) {
     *ledAdr->port |= ledAdr->pin;
   } else {
     *ledAdr->port &= ~ledAdr->pin;
@@ -116,16 +121,17 @@ void main(void) {
 
 ISR(TIM0_OVF) {
   uint8_t i;
+  uint8_t adrShift = ledAddressesLen * inverse + (1 - 2 * inverse) * ledAddressShift;
+  uint8_t bShift = ledAddressesLen - adrShift;
   // Модуляция
   brightnessMask = (brightnessMask >> 1) | (brightnessMask << 7);
   TCNT0 = ~brightnessMask;
   // Зажигаем диоды
-  uint8_t bShft = ledAddressesLen - ledAddressShift;
-  for (i = 0; i < ledAddressShift; i++) {
-    setBrightness(&ledAddresses[i], ledBrightness[ledAddressesLen * inverse + (1 - 2 * inverse) * (i + bShft)]);
+  for (i = 0; i < adrShift; i++) {
+    setBrightness(&ledAddresses[i], ledBrightness[(ledAddressesLen - 1) * inverse + (1 - 2 * inverse) * (i + bShift)]);
   }
-  for (i = ledAddressShift; i < ledAddressesLen; i++) {
-    setBrightness(&ledAddresses[i], ledBrightness[ledAddressesLen * inverse + (1 - 2 * inverse) * (i - ledAddressShift)]);
+  for (i = adrShift; i < ledAddressesLen; i++) {
+    setBrightness(&ledAddresses[i], ledBrightness[(ledAddressesLen - 1) * inverse + (1 - 2 * inverse) * (i - adrShift)]);
   }
 
   if (brightnessMask == 0b00000001) {
@@ -136,6 +142,7 @@ ISR(TIM0_OVF) {
 }
 
 ISR(TIM1_OVF) {
+  TCNT1 = velocity;
   // Обнуляем счетчик
   if (++ledAddressShift == ledAddressesLen) {
     ledAddressShift = 0;
