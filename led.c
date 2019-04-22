@@ -2,30 +2,20 @@
 #include <interrupt.h>
 #include <stdint.h>
 
-uint16_t velocity = 35000;
+uint16_t velocity = 40000;
 uint8_t velocityCounter = 0;
 uint8_t inverse = 0;
-uint8_t velocityChangePeriod = 244;
+uint8_t velocityChangePeriod = 122;
 uint16_t a = 5000;
 void acceleration() {
-  //uint16_t diff;
-  //uint8_t flags;
-  //cli();
-  //diff = velocity + (-2 * inverse + 1) * a;
-  //flags = SREG;
-  //sei();
-  if (0xffff - velocity <= a ) {
-  //if (flags & 0b1000) {
-      inverse = !inverse;
-      a = -a;
-      velocity = 0xffff;
-  } else if (velocity <= a) {
-  //} else if (flags & 0b100) {
+  if(0xffff - velocity <= a && !inverse) {
     inverse = !inverse;
-    a = -a;
+    velocity = 0xffff;
+  } else if(velocity <= a && inverse) {
+    inverse = !inverse;
     velocity = 0b0;
   } else {
-    velocity = velocity + (-2 * inverse + 1) * a;
+    velocity = (-2 * inverse + 1) * a + velocity;
   }
 }
 
@@ -183,6 +173,7 @@ ISR(TIM0_OVF) {
   if (brightnessMask == 0b00000001) {
     if (++velocityCounter == velocityChangePeriod) {
       acceleration();
+      velocityCounter = 0;
     }
 	  if (++brCounter == brChangeStep) {
 
