@@ -8,22 +8,24 @@ uint8_t inverse = 0;
 uint8_t velocityChangePeriod = 244;
 uint16_t a = 5000;
 void acceleration() {
-  uint16_t diff;
-  uint8_t flags;
-  cli();
-  diff = velocity + (-2 * inverse + 1) * a;
-  flags = SREG;
-  sei();
-  if (flags & 0b1000) {
-    inverse = !inverse;
-    a = -a;
-    velocity = 0xffff;
-  } else if (flags & 0b100) {
+  //uint16_t diff;
+  //uint8_t flags;
+  //cli();
+  //diff = velocity + (-2 * inverse + 1) * a;
+  //flags = SREG;
+  //sei();
+  if (0xffff - velocity <= a ) {
+  //if (flags & 0b1000) {
+      inverse = !inverse;
+      a = -a;
+      velocity = 0xffff;
+  } else if (velocity <= a) {
+  //} else if (flags & 0b100) {
     inverse = !inverse;
     a = -a;
     velocity = 0b0;
   } else {
-    velocity = diff;
+    velocity = velocity + (-2 * inverse + 1) * a;
   }
 }
 
