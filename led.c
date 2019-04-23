@@ -5,7 +5,7 @@
 uint16_t velocity = 40000;
 uint8_t velocityCounter = 0;
 uint8_t inverse = 0;
-uint8_t velocityChangePeriod = 122;
+uint8_t velocityChangePeriod = 100;
 uint16_t a = 5000;
 void acceleration() {
   if(0xffff - velocity <= a && !inverse) {
@@ -169,7 +169,7 @@ ISR(TIM0_OVF) {
   for (i = adrShift; i < ledAddressesLen; i++) {
     setBrightness(&ledAddresses[i], ledBrightness[(ledAddressesLen - 1) * inverse + (1 - 2 * inverse) * (i - adrShift)]);
   }
-
+  // »змен€ем скорость и €ркость
   if (brightnessMask == 0b00000001) {
     if (++velocityCounter == velocityChangePeriod) {
       acceleration();
