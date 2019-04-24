@@ -8,9 +8,9 @@ uint8_t inverse = 0;
 uint8_t velocityChangePeriod = 100;
 uint16_t a = 5000;
 void acceleration() {
-  if(0xffff - velocity <= a && !inverse) {
+  if(0xffff - velocity - a <= 1024 && !inverse) {
     inverse = !inverse;
-    velocity = 0xffff;
+    velocity = 0xfbff;
   } else if(velocity <= a && inverse) {
     inverse = !inverse;
     velocity = 0b0;
@@ -67,7 +67,7 @@ uint8_t brCounter = 0;
 uint8_t amplitude = 0;
 uint8_t smoothly = 1;
 uint8_t brDiff[ledAddressesLen];
-void brChangeInit() {
+/*void brChangeInit() {
   uint8_t i;
   uint8_t amp;
 
@@ -88,7 +88,7 @@ void brChangeInit() {
       brDiff[i] = (0xff * brBrightDir[i] + (1 - 2 * brBrightDir[i]) * ledBrightness[i]);
     }
   }
-}
+}*/
 
 // Вспомогательная функция для реализации модуляции
 void setBrightness(pinAddresses *ledAdr, uint8_t brightness) {
@@ -142,7 +142,7 @@ void main(void) {
   TCCR0A = 0b00000000; // настрока таймера
   //TCCR0B = 0b00000000;
   //TCNT0 = 0x0; // установка начального значения счетчика
-  TCNT0 = ~brightnessMask;
+  TCNT0 = 0;
   // Настройка таймера1
   TCCR1A = 0b00000000; // настрока таймера
   //TCCR1B = 0b00000000;
@@ -159,9 +159,6 @@ ISR(TIM0_OVF) {
   uint8_t i;
   uint8_t adrShift = ledAddressesLen * inverse + (1 - 2 * inverse) * ledAddressShift;
   uint8_t bShift = ledAddressesLen - adrShift;
-  // Модуляция
-  brightnessMask = (brightnessMask >> 1) | (brightnessMask << 7);
-  TCNT0 = ~brightnessMask;
   // Зажигаем диоды
   for (i = 0; i < adrShift; i++) {
     setBrightness(&ledAddresses[i], ledBrightness[(ledAddressesLen - 1) * inverse + (1 - 2 * inverse) * (i + bShift)]);
@@ -179,6 +176,9 @@ ISR(TIM0_OVF) {
 
 	  }
 	}
+  // Модуляция
+  TCNT0 = ~brightnessMask;
+  brightnessMask = (brightnessMask >> 1) | (brightnessMask << 7);
 }
 
 ISR(TIM1_OVF) {
