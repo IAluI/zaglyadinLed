@@ -30,6 +30,20 @@ uint8_t ledAddressesLen = sizeof(ledAddresses) / sizeof(pinAddresses);
 uint8_t ledAddressShift = 0;
 
 //Массив яркостей светодиодов
+uint8_t ledBrightnessRef[ledAddressesLen] = {
+    0b00011001,
+    0b10000000,
+    0b11111111,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000,
+    0b00000000
+};
 uint8_t ledBrightness[ledAddressesLen] = {
     0b00011001,
     0b10000000,
@@ -45,7 +59,7 @@ uint8_t ledBrightness[ledAddressesLen] = {
     0b00000000
 };
 uint8_t brightnessMask = 0b00000001;
-// 0 - уменьщать, 1 - увеличивать, 2 - не изменять
+// 0 - не изменять, 1 - уменьщать, 2 - увеличивать
 uint8_t brBrightDir[ledAddressesLen] = {
 	0,
 	0,
@@ -56,39 +70,46 @@ uint8_t brBrightDir[ledAddressesLen] = {
 	0,
 	0,
 	0,
-	0,
-	0,
-	0
+	1,
+	2,
+	1
 };
-uint8_t brChangePeriod = 256;
-uint8_t brChangeStep = 16;
+uint8_t brChangePeriod = 100;
 uint8_t brCounter = 0;
-// 1 - от текущего до максимума/минимума и обратно, 2 - от текущего полный цикл в заданном направлении
-uint8_t amplitude = 0;
-uint8_t smoothly = 1;
-uint8_t brDiff[ledAddressesLen];
-/*void brChangeInit() {
+uint8_t brChangeSteps = 17;
+uint8_t brChangeStep = 15; // 255 / brChangeSteps
+uint8_t brChangeStepI = 0;
+
+void brChange() {
   uint8_t i;
-  uint8_t amp;
-
-  if (amplitude) {
-    amp = 4;
-  } else {
-    amp = 8;
+  uint16_t curStepVal;
+  for (i = 0; i < ledAddressesLen; i++) {
+    if (brBrightDir[i]) {
+      curStepVal = ledBrightnessRef[i] + brChangeStepI * brChangeStep;
+      if (brBrightDir[i] == 1) {
+        if (curStepVal <= 255) {
+          ledBrightness[i] = curStepVal;
+        } else if (curStepVal <= 510) {
+          ledBrightness[i] = 510 - curStepVal;
+        } else if (curStepVal <= 510 + ledBrightnessRef[i]) {
+          ledBrightness[i] = curStepVal - 510;
+        }
+      } else {
+        if (curStepVal <= 2 * ledBrightnessRef[i]) {
+          ledBrightness[i] = 2 * ledBrightnessRef[i] - curStepVal;
+        } else if (curStepVal <= 255 + 2 * ledBrightnessRef[i]) {
+          ledBrightness[i] = curStepVal - 2 * ledBrightnessRef[i];
+        } else if (curStepVal <= 510 + ledBrightnessRef[i]) {
+          ledBrightness[i] = 510 + 2 * ledBrightnessRef[i] - curStepVal;
+        }
+      }
+    }
   }
 
-  for(i = 0; i < ledAddressesLen; i++) {
-    if(brBrightDir[i] == 2) {
-      brDiff[i] = 0;
-      continue;
-    }
-    if (smoothly) {
-      brDiff[i] = (0xff * brBrightDir[i] + (1 - 2 * brBrightDir[i]) * ledBrightness[i]) / (brChangePeriod / amp / brChangeStep);
-    } else {
-      brDiff[i] = (0xff * brBrightDir[i] + (1 - 2 * brBrightDir[i]) * ledBrightness[i]);
-    }
+  if (++brChangeStepI == 2 * brChangeSteps) {
+    brChangeStepI = 0;
   }
-}*/
+}
 
 // Вспомогательная функция для реализации модуляции
 void setBrightness(pinAddresses *ledAdr, uint8_t brightness) {
@@ -169,11 +190,12 @@ ISR(TIM0_OVF) {
   // Изменяем скорость и яркость
   if (brightnessMask == 0b00000001) {
     if (++velocityCounter == velocityChangePeriod) {
-      acceleration();
       velocityCounter = 0;
+      acceleration();
     }
-	  if (++brCounter == brChangeStep) {
-
+	  if (++brCounter == brChangePeriod) {
+      brCounter = 0;
+      brChange();
 	  }
 	}
   // Модуляция
