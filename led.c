@@ -106,7 +106,7 @@ void main(void) {
   TCCR0A = 0b00000000; // настрока таймера
   //TCCR0B = 0b00000000;
   //TCNT0 = 0x0; // установка начального значения счетчика
-  TCNT0 = ~brightnessMask;
+  TCNT0 = 0;
   // Настройка таймера1
   TCCR1A = 0b00000000; // настрока таймера
   //TCCR1B = 0b00000000;
@@ -120,30 +120,31 @@ void main(void) {
 }
 
 ISR(TIM0_OVF) {
-    uint8_t i;
-    // Сохраняем текущее состояние счетчика в буфер
-    uint8_t buff = counter;
-    // Модуляция
-    brightnessMask = (brightnessMask >> 1) | (brightnessMask << 7);
-    TCNT0 = ~brightnessMask;
-    // Зажигаем диоды
-    for (i = 0; i < 3; i++) {
-      setBrightness(&ledAdreses[(buff + 3 - i) % 12], i + brightnessShift * 3);
-    }
+  uint8_t i;
+  // Сохраняем текущее состояние счетчика в буфер
+  uint8_t buff = counter;
+  // Зажигаем диоды
+  for (i = 0; i < 3; i++) {
+    setBrightness(&ledAdreses[(buff + 3 - i) % 12], i + brightnessShift * 3);
+  }
+  // Модуляция
+  TCNT0 = ~brightnessMask;
+  brightnessMask = (brightnessMask >> 1) | (brightnessMask << 7);
+
 }
 
 ISR(TIM1_OVF) {
-    // Считываем состояние ключей
-    settings = getInputValue(PIND);
-    // Выставляем начальное значение счетчика в соответсвии с выбранной скоростью
-    TCNT1 = speed[settingsCodes[settings] & 0b011];
-    // Сохраняем настройки яркости
-    brightnessShift = settingsCodes[settings] >> 2;
+  // Считываем состояние ключей
+  settings = getInputValue(PIND);
+  // Выставляем начальное значение счетчика в соответсвии с выбранной скоростью
+  TCNT1 = speed[settingsCodes[settings] & 0b011];
+  // Сохраняем настройки яркости
+  brightnessShift = settingsCodes[settings] >> 2;
 
-    // Обнуляем счетчик
-    if (++counter == ledAdresesLen) {
-      counter = 0;
-    }
-    // Гасим диод идущий за последним горящим
-    *(ledAdreses[counter % 12].port) &= ~ledAdreses[counter].pin;
+  // Обнуляем счетчик
+  if (++counter == ledAdresesLen) {
+    counter = 0;
+  }
+  // Гасим диод идущий за последним горящим
+  *(ledAdreses[counter % 12].port) &= ~ledAdreses[counter].pin;
 }
