@@ -120,8 +120,8 @@ void main(void) {
   TCCR0B = 0b00000100; // Запуск таймера0 с делителем 256
 
   //TCCR1B = 0b00000010; // Запуск таймера1 с делителем 8
-  //TCCR1B = 0b00000100; // Запуск таймера1 с делителем 256
-  TCCR1B = 0b00000011; // Запуск таймера1 с делителем 64
+  TCCR1B = 0b00000100; // Запуск таймера1 с делителем 256
+  //TCCR1B = 0b00000011; // Запуск таймера1 с делителем 64
 }
 
 ISR(TIM0_OVF) {
@@ -129,11 +129,36 @@ ISR(TIM0_OVF) {
   // Сохраняем текущее состояние счетчика в буфер
   uint8_t buff = counter;
 
-  // Зажигаем диоды
+  /*// Зажигаем диоды
   for (i = 0; i < 3; i++) {
     setBrightness(&ledAdreses[(buff + 3 - i) % ledAdresesLen], brightness[i + brightnessShift * 3]);
   }
-  setBrightness(&centralLed, 0xf0);
+  setBrightness(&centralLed, 0xf0);*/
+
+  if (buff < 3) {
+    for (i = 0; i <= buff; i++) {
+      setBrightness(&ledAdreses[i], brightness[2 - i + brightnessShift * 3]);
+    }
+  } else if (buff < 11) {
+    for (i = 0; i < 3; i++) {
+      setBrightness(&ledAdreses[buff - i], brightness[i + brightnessShift * 3]);
+    }
+  } else if (buff < 13) {
+    for (i = 0; i < 2 - buff % ledAdresesLen; i++) {
+      setBrightness(&ledAdreses[buff + i - 2], brightness[2 - i + brightnessShift * 3]);
+    }
+  } else if (buff < 18) {
+    setBrightness(&centralLed, 51 * (buff - 12));
+  } else if (buff < 23) {
+    for(i = 0; i < ledAdresesLen; i++) {
+      setBrightness(&ledAdreses[i], 51 * (buff - 17));
+    }
+  } else if (buff < 28) {
+    for(i = 0; i < ledAdresesLen; i++) {
+      setBrightness(&ledAdreses[i], 255 - 51 * (buff - 22));
+    }
+    setBrightness(&centralLed, 255 - 51 * (buff - 22));
+  }
 
   // Модуляция
   TCNT0 = ~brightnessMask;
@@ -141,6 +166,8 @@ ISR(TIM0_OVF) {
 }
 
 ISR(TIM1_OVF) {
+  uint8_t i;
+
   // Считываем состояние ключей
   settings = getInputValue(PIND);
   // Выставляем начальное значение счетчика в соответсвии с выбранной скоростью
@@ -149,9 +176,11 @@ ISR(TIM1_OVF) {
   brightnessShift = settingsCodes[settings] >> 2;
 
   // Обнуляем счетчик
-  if(++counter == ledAdresesLen) {
+  if (++counter == 28) {
     counter = 0;
   }
-  // Гасим диод идущий за последним горящим
-  *(ledAdreses[counter % ledAdresesLen].port) &= ~ledAdreses[counter].pin;
+  // Гасим все диоды
+  for(i = 0; i < ledAdresesLen; i++) {
+    *(ledAdreses[i].port) &= ~ledAdreses[i].pin;
+  }
 }
