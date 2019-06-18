@@ -18,7 +18,8 @@ uint8_t settingsCodes[8] = {
 };
 // Массив скоростей
 uint16_t speed[4] = {
-    0x3333,
+    //0x3333,
+    0x0000,
     0x8000,
     0xA666
 };
@@ -43,9 +44,10 @@ typedef struct pinAdreses_t {
     uint8_t *port;
     uint8_t pin;
 } pinAdreses;
-pinAdreses ledAdreses[12];
+pinAdreses ledAdreses[11];
 // Размер массива адресов диодов
 uint8_t ledAdresesLen = sizeof(ledAdreses) / sizeof(pinAdreses);
+pinAdreses centralLed;
 
 // Функция чтения состояния ключей
 uint8_t getInputValue(uint8_t port) {
@@ -53,8 +55,8 @@ uint8_t getInputValue(uint8_t port) {
 }
 
 // Вспомогательная функция для реализации модуляции
-void setBrightness(pinAdreses *ledAdr, uint8_t brightnessIndex) {
-  if (brightness[brightnessIndex] & brightnessMask) {
+void setBrightness(pinAdreses *ledAdr, uint8_t brightness) {
+  if (brightness & brightnessMask) {
     *ledAdr->port |= ledAdr->pin;
   } else {
     *ledAdr->port &= ~ledAdr->pin;
@@ -87,8 +89,11 @@ void main(void) {
   ledAdreses[9].pin = (1 << 5);
   ledAdreses[10].port = &PORTB;
   ledAdreses[10].pin = (1 << 6);
-  ledAdreses[11].port = &PORTB;
-  ledAdreses[11].pin = (1 << 7);
+  /*ledAdreses[11].port = &PORTB;
+  ledAdreses[11].pin = (1 << 7);*/
+
+  centralLed.port = &PORTB;
+  centralLed.pin = (1 << 7);
 
   // Конфигурируем и инициализируем порты ввода вывода
   DDRA = 0b011;
@@ -123,14 +128,16 @@ ISR(TIM0_OVF) {
   uint8_t i;
   // Сохраняем текущее состояние счетчика в буфер
   uint8_t buff = counter;
+
   // Зажигаем диоды
   for (i = 0; i < 3; i++) {
-    setBrightness(&ledAdreses[(buff + 3 - i) % 12], i + brightnessShift * 3);
+    setBrightness(&ledAdreses[(buff + 3 - i) % ledAdresesLen], brightness[i + brightnessShift * 3]);
   }
+  setBrightness(&centralLed, 0xf0);
+
   // Модуляция
   TCNT0 = ~brightnessMask;
   brightnessMask = (brightnessMask >> 1) | (brightnessMask << 7);
-
 }
 
 ISR(TIM1_OVF) {
@@ -142,9 +149,9 @@ ISR(TIM1_OVF) {
   brightnessShift = settingsCodes[settings] >> 2;
 
   // Обнуляем счетчик
-  if (++counter == ledAdresesLen) {
+  if(++counter == ledAdresesLen) {
     counter = 0;
   }
   // Гасим диод идущий за последним горящим
-  *(ledAdreses[counter % 12].port) &= ~ledAdreses[counter].pin;
+  *(ledAdreses[counter % ledAdresesLen].port) &= ~ledAdreses[counter].pin;
 }
