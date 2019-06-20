@@ -18,8 +18,8 @@ uint8_t settingsCodes[8] = {
 };
 // Массив скоростей
 uint16_t speed[4] = {
-    //0x3333,
-    0x0000,
+    0x3333,
+    //0x0000,
     0x8000,
     0xA666
 };
@@ -44,9 +44,11 @@ typedef struct pinAdreses_t {
     uint8_t *port;
     uint8_t pin;
 } pinAdreses;
+// Массив с адресами группы диодов
 pinAdreses ledAdreses[11];
 // Размер массива адресов диодов
 uint8_t ledAdresesLen = sizeof(ledAdreses) / sizeof(pinAdreses);
+// Адрес центрального диода
 pinAdreses centralLed;
 
 // Функция чтения состояния ключей
@@ -63,9 +65,58 @@ void setBrightness(pinAdreses *ledAdr, uint8_t brightness) {
   }
 }
 
+// Функция реализующая первый режим работы
+void mode_1(uint8_t counter) {
+  uint8_t i;
+
+  for (i = 0; i < 3; i++) {
+    setBrightness(&ledAdreses[(counter + 3 - i) % ledAdresesLen], brightness[i + brightnessShift * 3]);
+  }
+  setBrightness(&centralLed, 0xf0);
+}
+
+// Функция реализующая второй режим работы
+void mode_2(uint8_t counter) {
+  uint8_t i;
+
+  if (counter < 3) {
+    for (i = 0; i <= counter; i++) {
+      setBrightness(&ledAdreses[i], brightness[2 - i + brightnessShift * 3]);
+    }
+  } else if (counter < 11) {
+    for (i = 0; i < 3; i++) {
+      setBrightness(&ledAdreses[counter - i], brightness[i + brightnessShift * 3]);
+    }
+  } else if (counter < 13) {
+    for (i = 0; i < 2 - counter % ledAdresesLen; i++) {
+      setBrightness(&ledAdreses[counter + i - 2], brightness[2 - i + brightnessShift * 3]);
+    }
+  } else if (counter < 18) {
+    setBrightness(&centralLed, 51 * (counter - 12));
+  } else if (counter < 23) {
+    for (i = 0; i < ledAdresesLen; i++) {
+      setBrightness(&ledAdreses[i], 51 * (counter - 17));
+    }
+  } else if (counter < 28) {
+    for (i = 0; i < ledAdresesLen; i++) {
+      setBrightness(&ledAdreses[i], 255 - 51 * (counter - 22));
+    }
+    setBrightness(&centralLed, 255 - 51 * (counter - 22));
+  }
+}
+
+void(*modes[2])(uint8_t counter) = {
+  mode_1,
+  mode_2
+};
+uint8_t operationMode = 0;
 uint8_t counter = 0;
+uint8_t counterMax[2];
 
 void main(void) {
+  // Задаем длительность режимов
+  counterMax[0] = ledAdresesLen;
+  counterMax[1] = 28;
   // Инициализируем массив структур ханящих адрес порта и маску для выставление нужного бита данного порта в 1
   ledAdreses[0].port = &PORTD;
   ledAdreses[0].pin = (1 << 2);
@@ -120,45 +171,13 @@ void main(void) {
   TCCR0B = 0b00000100; // Запуск таймера0 с делителем 256
 
   //TCCR1B = 0b00000010; // Запуск таймера1 с делителем 8
-  TCCR1B = 0b00000100; // Запуск таймера1 с делителем 256
-  //TCCR1B = 0b00000011; // Запуск таймера1 с делителем 64
+  //TCCR1B = 0b00000100; // Запуск таймера1 с делителем 256
+  TCCR1B = 0b00000011; // Запуск таймера1 с делителем 64
 }
 
 ISR(TIM0_OVF) {
-  uint8_t i;
-  // Сохраняем текущее состояние счетчика в буфер
-  uint8_t buff = counter;
-
-  /*// Зажигаем диоды
-  for (i = 0; i < 3; i++) {
-    setBrightness(&ledAdreses[(buff + 3 - i) % ledAdresesLen], brightness[i + brightnessShift * 3]);
-  }
-  setBrightness(&centralLed, 0xf0);*/
-
-  if (buff < 3) {
-    for (i = 0; i <= buff; i++) {
-      setBrightness(&ledAdreses[i], brightness[2 - i + brightnessShift * 3]);
-    }
-  } else if (buff < 11) {
-    for (i = 0; i < 3; i++) {
-      setBrightness(&ledAdreses[buff - i], brightness[i + brightnessShift * 3]);
-    }
-  } else if (buff < 13) {
-    for (i = 0; i < 2 - buff % ledAdresesLen; i++) {
-      setBrightness(&ledAdreses[buff + i - 2], brightness[2 - i + brightnessShift * 3]);
-    }
-  } else if (buff < 18) {
-    setBrightness(&centralLed, 51 * (buff - 12));
-  } else if (buff < 23) {
-    for(i = 0; i < ledAdresesLen; i++) {
-      setBrightness(&ledAdreses[i], 51 * (buff - 17));
-    }
-  } else if (buff < 28) {
-    for(i = 0; i < ledAdresesLen; i++) {
-      setBrightness(&ledAdreses[i], 255 - 51 * (buff - 22));
-    }
-    setBrightness(&centralLed, 255 - 51 * (buff - 22));
-  }
+  // Определение текущго режима
+  modes[operationMode](counter);
 
   // Модуляция
   TCNT0 = ~brightnessMask;
@@ -176,11 +195,11 @@ ISR(TIM1_OVF) {
   brightnessShift = settingsCodes[settings] >> 2;
 
   // Обнуляем счетчик
-  if (++counter == 28) {
+  if (++counter == counterMax[operationMode]) {
     counter = 0;
   }
   // Гасим все диоды
-  for(i = 0; i < ledAdresesLen; i++) {
+  for (i = 0; i < ledAdresesLen; i++) {
     *(ledAdreses[i].port) &= ~ledAdreses[i].pin;
   }
 }
