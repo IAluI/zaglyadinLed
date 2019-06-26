@@ -45,16 +45,11 @@ typedef struct pinAdreses_t {
     uint8_t pin;
 } pinAdreses;
 // Массив с адресами группы диодов
-pinAdreses ledAdreses[11];
+pinAdreses ledAdreses[12];
 // Размер массива адресов диодов
 uint8_t ledAdresesLen = sizeof(ledAdreses) / sizeof(pinAdreses);
 // Адрес центрального диода
 pinAdreses centralLed;
-
-// Функция чтения состояния ключей
-uint8_t getInputValue(uint8_t port) {
-  return (port & 0b00111000) >> 3;
-}
 
 // Вспомогательная функция для реализации модуляции
 void setBrightness(pinAdreses *ledAdr, uint8_t brightness) {
@@ -125,34 +120,36 @@ void main(void) {
   ledAdreses[2].port = &PORTA;
   ledAdreses[2].pin = (1 << 1);
   ledAdreses[3].port = &PORTD;
-  ledAdreses[3].pin = (1 << 6);
-  ledAdreses[4].port = &PORTB;
-  ledAdreses[4].pin = (1 << 0);
+  ledAdreses[3].pin = (1 << 1);
+  ledAdreses[4].port = &PORTD;
+  ledAdreses[4].pin = (1 << 6);
   ledAdreses[5].port = &PORTB;
-  ledAdreses[5].pin = (1 << 1);
+  ledAdreses[5].pin = (1 << 0);
   ledAdreses[6].port = &PORTB;
-  ledAdreses[6].pin = (1 << 2);
+  ledAdreses[6].pin = (1 << 1);
   ledAdreses[7].port = &PORTB;
-  ledAdreses[7].pin = (1 << 3);
+  ledAdreses[7].pin = (1 << 2);
   ledAdreses[8].port = &PORTB;
-  ledAdreses[8].pin = (1 << 4);
+  ledAdreses[8].pin = (1 << 3);
   ledAdreses[9].port = &PORTB;
-  ledAdreses[9].pin = (1 << 5);
+  ledAdreses[9].pin = (1 << 4);
   ledAdreses[10].port = &PORTB;
-  ledAdreses[10].pin = (1 << 6);
-  /*ledAdreses[11].port = &PORTB;
-  ledAdreses[11].pin = (1 << 7);*/
+  ledAdreses[10].pin = (1 << 5);
+  ledAdreses[11].port = &PORTB;
+  ledAdreses[11].pin = (1 << 6);
+  /*ledAdreses[12].port = &PORTB;
+  ledAdreses[12].pin = (1 << 7);*/
 
   centralLed.port = &PORTB;
   centralLed.pin = (1 << 7);
 
   // Конфигурируем и инициализируем порты ввода вывода
-  DDRA = 0b011;
+  DDRA =  0b011;
   PORTA = 0b100;
-  DDRB = 0b11111111;
+  DDRB =  0b11111111;
   PORTB = 0b00000000;
-  DDRD = 0b1000111;
-  PORTD = 0b0111000;
+  DDRD =  0b1000110;
+  PORTD = 0b0111001;
 
   // Настройка таймеров
   TIFR = 0x0; // сброс регистра флагов
@@ -188,11 +185,13 @@ ISR(TIM1_OVF) {
   uint8_t i;
 
   // Считываем состояние ключей
-  settings = getInputValue(PIND);
+  settings = (PIND & 0b00111000) >> 3;
   // Выставляем начальное значение счетчика в соответсвии с выбранной скоростью
   TCNT1 = speed[settingsCodes[settings] & 0b011];
   // Сохраняем настройки яркости
   brightnessShift = settingsCodes[settings] >> 2;
+  // Считываем текущий режим работы
+  operationMode = (PIND & 0b00000001);
 
   // Обнуляем счетчик
   if (++counter == counterMax[operationMode]) {
